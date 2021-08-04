@@ -18,6 +18,12 @@ import os
 import argparse
 import cv2
 import numpy as np
+import imutils
+import datetime
+
+from imutils.video import FPS 
+from imutils.video import VideoStream
+from imutils.video import FileVideoStream
 import sys
 import time
 from threading import Thread
@@ -29,7 +35,8 @@ class VideoStream:
     """Camera object that controls video streaming from the Picamera"""
     def __init__(self,resolution=(640,480),framerate=30):
         # Initialize the PiCamera and the camera image stream
-        self.stream = cv2.VideoCapture("http://192.168.137.35:8080/video")#'http://192.168.137.99:8080/video'
+        self.stream = cv2.VideoCapture(0)#'http://192.168.137.99:8080/video'
+
         ret = self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         ret = self.stream.set(3,resolution[0])
         ret = self.stream.set(4,resolution[1])
@@ -156,7 +163,15 @@ freq = cv2.getTickFrequency()
 
 # Initialize video stream
 videostream = VideoStream(resolution=(imW,imH),framerate=30).start()
-time.sleep(1)
+fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
+time_string=time.strftime("%Y%m%d-%H%M%S")
+time_string=str(time_string)
+time_string=time_string+".m4v"
+video_writer = cv2.VideoWriter(time_string, fourcc, 30.0, (1280, 720))
+#time.sleep(1)
+fps = FPS().start()
+start=time.time()
+count_frame=0
 
 #for frame1 in camera.capture_continuous(rawCapture, format="bgr",use_video_port=True):
 while True:
@@ -165,10 +180,10 @@ while True:
     t1 = cv2.getTickCount()
 
     # Grab frame from video stream
-    frame1 = videostream.read()
+    frame = videostream.read()
 
     # Acquire frame and resize to expected shape [1xHxWx3]
-    frame = frame1.copy()
+    frame = frame.copy()
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame_resized = cv2.resize(frame_rgb, (width, height))
     input_data = np.expand_dims(frame_resized, axis=0)
@@ -218,20 +233,40 @@ while True:
             cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
 
     # Draw framerate in corner of frame
-    cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+    #cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+    #cv2.putText(frame,("Current Persons: "+str(current_Persons)),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
 
     # All the results have been drawn on the frame, so it's time to display it.
     #cv2.imshow('Object detector', frame)
+    end=time.time()
+    frame_per_sec=1/(end-start)
+
+    print("fps"+str(frame_per_sec))  
+    #print("person_count = "+str(person_count))
+    start=time.time()  
+    #cv2.imshow("Frame", frame)
+    #video_writer.write(frame)  # Write the video to the file system
+    count_frame=count_frame+1
+    #if cv2.waitKey(1) & 0xFF == ord('q'):
+        #break 
+    fps.update()
+    if count_frame==50:
+        video_writer.release()
+        break
+    video_writer.write(frame)
     #inception_v2_224_quant.tflite
     # Calculate framerate
     t2 = cv2.getTickCount()
     time1 = (t2-t1)/freq
     frame_rate_calc= 1/time1
 
+
     # Press 'q' to quit
     #if cv2.waitKey(1) == ord('q'):
         #break
 
 # Clean up
+
 cv2.destroyAllWindows()
 videostream.stop()
+
